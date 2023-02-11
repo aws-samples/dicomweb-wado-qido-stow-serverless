@@ -1,0 +1,11 @@
+
+cdk/cdk.context.json
+cdk/.cdk.staging/
+cdk/cdk.out/
+cdk/__pycache__/
+cdk/.venv/
+cdk/cdk/__py_cache__/
+.git/
+
+
+

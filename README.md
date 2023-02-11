@@ -105,3 +105,52 @@ At the end of the deployment the DICOM services are publicly accessible via Clou
  * `cdk diff`        compare deployed stack with current state
  * `cdk docs`        open CDK documentation
 
+## Testing
+
+### Sending DICOM data via STOWRS
+
+This section covers the steps to test that the stowrs-to-s3 web service has been successfully deployed and is ready to be used. The test steps provided below can only be used when the service is configured with the anonymous mode.
+
+### Steps
+
+1. Download and unzip the [dcm4che utilities](https://sourceforge.net/projects/dcm4che/files/dcm4che3/).
+2. In the `dcm4che-[version]/bin` folder, execute the following command:
+  ```console
+      For windows:
+      stowrs.bat -a json --limit 3 --allowAnyHost --url https://[AWSCloudFront URL]/studies [location of the DICOM data to send]
+  ```
+
+  ```console
+      For Linux:
+      ./stowrs -a json --limit 3 --allowAnyHost  --url https://[AWSCloudFront URL]/studies [[location of the DICOM data to send]]
+  ```
+
+If succeeded the service repsonse should look like this:
+```console
+  Scanning files to send
+Directory /home/jpleger/Code/stowrs-to-s3/dcm-samples/ contains 3 paths.
+..
+Scanned 3 files in 0.028s (=9ms/file)
+..
+Connected to https://ds5j2eq8xrdah.cloudfront.net/studies in 131ms
+14:55:14.135 INFO  - > POST https://stowrstos3.awsjpleger.us/studies
+14:55:14.138 INFO  - > Accept : application/dicom+json
+14:55:14.138 INFO  - > Content-Type : multipart/related; type="application/dicom"; boundary=myboundary
+14:55:14.886 INFO  - < HTTP/1.1 Response: 200 OK
+14:55:14.886 INFO  - < Server : nginx/1.22.0
+14:55:14.887 INFO  - < Connection : keep-alive
+14:55:14.887 INFO  - < Content-Length : 1676
+14:55:14.887 INFO  - < Date : Mon, 01 Aug 2022 19:55:14 GMT
+14:55:14.887 INFO  - < Content-Type : application/json
+14:55:14.887 INFO  - < Response Content: 
+14:55:14.888 DEBUG - {"00081190": {"Value": ["https://[WADOURL]/dicomweb/studies/1.3.6.1.4.1.14519.5.2.1.2692.1975.673079780724926389963058818628"], "vr": "UR"}, "00081198": {"Value": [], "vr": "SQ"}, "00081199": {"Value": [{"00081150": {"Value": ["1.2.840.10008.5.1.4.1.1.2"], "vr": "UI"}, "00081155": {"Value": ["1.3.6.1.4.1.14519.5.2.1.2692.1975.202691873465793515864363478235"], "vr": "UI"}, "00081190": {"Value": ["https://[WADOURL]/dicomweb/studies/1.3.6.1.4.1.14519.5.2.1.2692.1975.673079780724926389963058818628/series/1.3.6.1.4.1.14519.5.2.1.2692.1975.219841223840616301810162211436/instances/1.3.6.1.4.1.14519.5.2.1.2692.1975.202691873465793515864363478235"], "vr": "UR"}}, {"00081150": {"Value": ["1.2.840.10008.5.1.4.1.1.2"], "vr": "UI"}, "00081155": {"Value": ["1.3.6.1.4.1.14519.5.2.1.2692.1975.213159715579379981169498621170"], "vr": "UI"}, "00081190": {"Value": ["https://[WADOURL]/dicomweb/studies/1.3.6.1.4.1.14519.5.2.1.2692.1975.673079780724926389963058818628/series/1.3.6.1.4.1.14519.5.2.1.2692.1975.219841223840616301810162211436/instances/1.3.6.1.4.1.14519.5.2.1.2692.1975.213159715579379981169498621170"], "vr": "UR"}}, {"00081150": {"Value": ["1.2.840.10008.5.1.4.1.1.2"], "vr": "UI"}, "00081155": {"Value": ["1.3.6.1.4.1.14519.5.2.1.2692.1975.272935674749940779060447240348"], "vr": "UI"}, "00081190": {"Value": ["https://[WADOURL]/dicomweb/studies/1.3.6.1.4.1.14519.5.2.1.2692.1975.673079780724926389963058818628/series/1.3.6.1.4.1.14519.5.2.1.2692.1975.219841223840616301810162211436/instances/1.3.6.1.4.1.14519.5.2.1.2692.1975.272935674749940779060447240348"], "vr": "UR"}}], "vr": "SQ"}}
+Sent 3 objects (=0.723MB) in 0.756s (=0.957MB/s) in this http request
+Sent overall 3 objects (=0.723MB) in 0.887s (=0.816MB/s) in one TCP connection
+```
+
+<b>Note:</b> Run the command `stowrs.bat --help` or `./stowrs --help` to review the options of this utility, in particular the ones related to certificate verification in case the web service is configured to use a private certificate. 
+
+### displaying the data via OHIF
+
+The data sent to the STOWRS service ( or directly copied in the S3 landing bucket ) can be displayed by browsing to the OHIF URL provided at the end of the CDK deployment.
+![OHIF displaying the study sent](img/ohif-example.png)

@@ -26,7 +26,7 @@ RESOURCE_TAGS = {
 }
 
 
-## Advanced configurations - NO chnages required for default deployment.
+## Advanced configurations - NO changes required for default deployment.
 
 DB_NAME = "study_series"
 

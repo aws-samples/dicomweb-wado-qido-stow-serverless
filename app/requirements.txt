@@ -3,5 +3,5 @@ botocore==1.23.46
 Flask==2.1.2
 pydicom==2.2.2
 waitress==2.1.2
-Werkzeug==2.1.2
+Werkzeug==2.2.3
 wsproto==0.15.0

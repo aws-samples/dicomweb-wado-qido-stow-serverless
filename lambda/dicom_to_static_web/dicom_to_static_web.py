@@ -73,8 +73,9 @@ def lambda_handler(event, context):
             inst_key = create_instances_record (ds, bucket_out, series_key)
             #save pixel data 
 
-            write_frames(ds, bucket_out, inst_key)
-            write_NIO( ds, bucket_out, inst_key )
+            pixelDataPresent=write_frames(ds, bucket_out, inst_key)
+            if((ds.Modality == 'SEG') or (pixelDataPresent == False)):
+                write_NIO( ds, bucket_out, inst_key )
 
 
 def create_study_record (ds, base_prefix, bucket_out, bucket_out_name):

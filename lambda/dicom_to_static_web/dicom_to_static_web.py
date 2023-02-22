@@ -10,6 +10,8 @@ import botocore
 import uuid
 from urllib.parse import unquote_plus
 import logging
+from pydicom import dcmread, dcmwrite
+from pydicom.filebase import DicomFileLike
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -70,7 +72,10 @@ def lambda_handler(event, context):
             # Create Instances Records
             inst_key = create_instances_record (ds, bucket_out, series_key)
             #save pixel data 
-            write_frames (ds, bucket_out, inst_key)
+
+            write_frames(ds, bucket_out, inst_key)
+            write_NIO( ds, bucket_out, inst_key )
+
 
 def create_study_record (ds, base_prefix, bucket_out, bucket_out_name):
     study_list_key = base_prefix + 'studies'
@@ -159,7 +164,7 @@ def create_instances_record (ds, bucket_out, ser_key):
         js = json.dumps(json_data)
         bucket_out.put_object(Body=js, Key = instance_metadata_key, ContentType = 'application/json')
 
-        return instance_prefix
+    return instance_prefix
 
 def get_content_type (transfer_syntax):
     content_types = {
@@ -192,7 +197,7 @@ def get_content_type (transfer_syntax):
         cont_type = "application/octet-stream"
     return cont_type
 
-def encode_multipart_frame(transfer_syntax, frame_bytes):
+def encode_multipart_object(transfer_syntax, object_bytes):
     hd = '--' + boundary + '\r\nContent-Type: '
     ct = get_content_type(transfer_syntax)
     tshd = '; transfer-syntax="'
@@ -206,10 +211,27 @@ def encode_multipart_frame(transfer_syntax, frame_bytes):
     multipart_frame += ts.encode()
     multipart_frame += tsft.encode()
     multipart_frame += crlf.encode()
-    multipart_frame += frame_bytes
+    multipart_frame += object_bytes
     multipart_frame += ft.encode()
     return multipart_frame
-    
+
+def write_NIO(ds, bucket_out, inst_key):
+    print(f"[write_NIO] "+str(inst_key))
+    try:
+        transfer_syntax = ds.file_meta.TransferSyntaxUID
+    except:
+        transfer_syntax = '1.2.840.10008.1.2'
+        if debug:
+            print('TransferSyntaxUID not found')
+    with io.BytesIO() as buffer:
+        memory_dataset = DicomFileLike(buffer)
+        dcmwrite(memory_dataset, ds)
+        memory_dataset.seek(0)
+        payload = memory_dataset.read()
+    object_bytes = encode_multipart_object(transfer_syntax, payload)
+    bucket_out.put_object(Body=object_bytes, Key = str(inst_key), ContentType = 'multipart/related; boundary="'+boundary+'"')
+    return None
+
 def write_frames (ds, bucket_out, i_key):
     instance_frame_key = str(i_key) + '/frames/'
     try:
@@ -224,14 +246,14 @@ def write_frames (ds, bucket_out, i_key):
         if debug:
             print('TransferSyntaxUID not found')
 
-    content_type = get_content_type(transfer_syntax)
+    #content_type = get_content_type(transfer_syntax)
 
     try:
         px_data = ds.data_element("PixelData")  # Get PixelData data element to check data length
     except:
         # DICOM object has no pixel data, could be Presentation State, RT object or another non-image object
         logger.info("No Pixel data found ")
-        return
+        return False
 
     if px_data.is_undefined_length:   
         # Encapsulated compressed image
@@ -241,7 +263,7 @@ def write_frames (ds, bucket_out, i_key):
         fr_ind = 1
         for encoded_frame in generator:  # each frame is a compressed image
             print('====type of encoded frame = ' + str(type(encoded_frame)))
-            multipart_frame = encode_multipart_frame(transfer_syntax, encoded_frame)
+            multipart_frame = encode_multipart_object(transfer_syntax, encoded_frame)
             bucket_out.put_object(Body=multipart_frame, Key = instance_frame_key+str(fr_ind), ContentType = 'multipart/related; boundary="'+boundary+'"')
     else:
         # Native image
@@ -262,8 +284,9 @@ def write_frames (ds, bucket_out, i_key):
             # check the end of buffer
             if len(ds.PixelData) < int((fr_ind + 1) * fr_size):
                     print('PixelData length '+str(len(ds.PixelData))+' is too short. Frame #'+str(fr_ind)+'expected end '+str(int((fr_ind + 1)*fr_size)))
-            multipart_frame = encode_multipart_frame(transfer_syntax, ds.PixelData[ind_from:ind_to])
+            multipart_frame = encode_multipart_object(transfer_syntax, ds.PixelData[ind_from:ind_to])
             bucket_out.put_object(Body=multipart_frame, Key = instance_frame_key+ str(fr_ind+1), ContentType = 'multipart/related; boundary="'+boundary+'"')
+    return True
 
 def qido_rs_series(ds):
     series_attr=[[0x0008,0x0005,'SpecificCharacterSet'],            # Specific Character Set 
